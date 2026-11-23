@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#17152b">
-  <title>Random Joke Generator</title>
+  <title>Random Joke Generator on a 3D Hill</title>
   <style>
     :root {
       color-scheme: dark;
@@ -19,21 +19,32 @@
       display: grid;
       place-items: center;
       padding: 24px;
-      background: radial-gradient(ellipse at 50% 0%, #41316c 0, #241f43 42%, #17152b 78%);
+      overflow: hidden;
+      background: #8eb6d4;
+    }
+    #hill-scene {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      display: block;
     }
     main {
+      position: relative;
+      z-index: 1;
       width: min(100%, 620px);
       padding: clamp(28px, 7vw, 56px);
       text-align: center;
-      background: rgb(255 255 255 / 7%);
-      border: 1px solid rgb(255 255 255 / 14%);
+      background: rgb(25 23 43 / 78%);
+      border: 1px solid rgb(255 255 255 / 28%);
       border-radius: 24px;
       box-shadow: 0 24px 80px rgb(0 0 0 / 30%);
       backdrop-filter: blur(12px);
     }
     .emoji { font-size: 3rem; }
     h1 { margin: 12px 0 8px; font-size: clamp(2rem, 7vw, 3rem); }
-    .intro { margin: 0 0 32px; color: #c9c4dd; }
+    .intro { margin: 0 0 32px; color: #d3cee4; }
     #joke {
       min-height: 108px;
       display: grid;
@@ -43,7 +54,6 @@
       font-size: 1.25rem;
       line-height: 1.6;
     }
-    #joke .punchline { color: #d7c2ff; font-weight: 700; }
     button {
       min-height: 50px;
       padding: 12px 24px;
@@ -59,12 +69,14 @@
     button:hover { transform: translateY(-2px); background: #cbb5ff; }
     button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
     button:disabled { cursor: wait; opacity: .7; }
-    #status { min-height: 24px; margin: 18px 0 0; color: #c9c4dd; font-size: .9rem; }
-    footer { margin-top: 30px; color: #aaa4c1; font-size: .8rem; }
+    #status { min-height: 24px; margin: 18px 0 0; color: #d3cee4; font-size: .9rem; }
+    footer { margin-top: 30px; color: #cbc5d8; font-size: .8rem; }
     footer a { color: #d7c2ff; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
   </style>
 </head>
 <body>
+  <canvas id="hill-scene" aria-hidden="true"></canvas>
   <main>
     <div class="emoji" aria-hidden="true">🎭</div>
     <h1>Need a laugh?</h1>
@@ -76,7 +88,86 @@
     <p id="status" role="status"></p>
     <footer>Jokes provided by <a href="https://icanhazdadjoke.com/" target="_blank" rel="noopener noreferrer">icanhazdadjoke.com</a></footer>
   </main>
-  <script>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+    const canvas = document.querySelector('#hill-scene');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#9bc9e8');
+    scene.fog = new THREE.Fog('#9bc9e8', 18, 55);
+
+    const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 100);
+    camera.position.set(0, 5.2, 15);
+    camera.lookAt(0, 2, -2);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    scene.add(new THREE.HemisphereLight('#e5f6ff', '#597342', 2));
+    const sunlight = new THREE.DirectionalLight('#fff0c2', 3.2);
+    sunlight.position.set(-5, 11, 7);
+    sunlight.castShadow = true;
+    sunlight.shadow.mapSize.set(1024, 1024);
+    scene.add(sunlight);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(100, 100),
+      new THREE.MeshStandardMaterial({ color: '#789b55', roughness: 1 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.08;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Create a gently rolling, rounded hill from a subdivided grid.
+    const hillGeometry = new THREE.PlaneGeometry(24, 22, 100, 100);
+    const positions = hillGeometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      const mound = 4.1 * Math.exp(-((x + 1.2) ** 2 / 62 + (y - 2.2) ** 2 / 27));
+      const rolling = 0.28 * Math.sin(x * 0.65) * Math.cos(y * 0.48);
+      positions.setZ(i, Math.max(0, mound + rolling));
+    }
+    positions.needsUpdate = true;
+    hillGeometry.computeVertexNormals();
+    const hill = new THREE.Mesh(
+      hillGeometry,
+      new THREE.MeshStandardMaterial({ color: '#70a64f', roughness: 1, flatShading: false })
+    );
+    hill.rotation.x = -Math.PI / 2;
+    hill.position.set(0, 0, -5);
+    hill.receiveShadow = true;
+    hill.castShadow = true;
+    scene.add(hill);
+
+    const sun = new THREE.Mesh(
+      new THREE.SphereGeometry(1.05, 32, 24),
+      new THREE.MeshBasicMaterial({ color: '#ffe6a1' })
+    );
+    sun.position.set(7, 8, -15);
+    scene.add(sun);
+
+    function resize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    }
+    addEventListener('resize', resize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
     const jokeArea = document.querySelector('#joke');
     const button = document.querySelector('#joke-button');
     const status = document.querySelector('#status');
