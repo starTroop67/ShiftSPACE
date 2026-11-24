@@ -1,51 +1,173 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Neon Clash 3D</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b18;font-family:system-ui,sans-serif;color:white}canvas{display:block}#hud{position:fixed;inset:0;pointer-events:none}#bars{position:absolute;top:24px;left:24px;right:24px;display:flex;justify-content:space-between}.bar{width:min(38vw,420px)}.track{height:18px;border:2px solid rgba(255,255,255,.8);border-radius:20px;background:#111;overflow:hidden}.fill{height:100%;width:100%;background:#55d8ff;box-shadow:0 0 16px #55d8ff}.enemy .fill{background:#ff527f;box-shadow:0 0 16px #ff527f;margin-left:auto}.enemy{text-align:right}#crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%)}#crosshair:before,#crosshair:after{content:"";position:absolute;background:white}#crosshair:before{width:2px;height:18px;left:8px}#crosshair:after{height:2px;width:18px;top:8px}#message{position:absolute;left:50%;top:20%;transform:translateX(-50%);font-size:clamp(32px,5vw,68px);font-weight:900;text-align:center;text-shadow:0 4px 20px #000}#slot{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:8px;padding:8px;border-radius:14px;background:rgba(5,7,18,.78);backdrop-filter:blur(8px)}.weapon{width:76px;height:54px;border:2px solid rgba(255,255,255,.18);border-radius:9px;text-align:center;padding-top:5px;font-size:11px;color:#bbb}.weapon b{display:block;font-size:20px;color:white}.weapon.active{border-color:#55d8ff;box-shadow:0 0 14px #55d8ff;color:white}#controls{position:absolute;left:50%;bottom:94px;transform:translateX(-50%);font-size:12px;text-shadow:0 2px 8px #000;text-align:center}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Neon Clash 3D</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b18;font-family:system-ui,sans-serif;color:#fff}
+    canvas{display:block}#help{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:rgba(5,7,18,.78);font-size:14px;letter-spacing:.04em;pointer-events:none}
+    #message{position:fixed;top:28px;left:50%;transform:translateX(-50%);font-size:34px;font-weight:900;text-shadow:0 3px 20px #000}
+  </style>
 </head>
 <body>
-<div id="hud">
-<div id="bars"><div class="bar"><b>YOU</b><div class="track"><div id="playerFill" class="fill"></div></div></div><div class="bar enemy"><b>AI OPPONENT</b><div class="track"><div id="enemyFill" class="fill"></div></div></div></div>
-<div id="crosshair"></div><div id="message">NEON CLASH<br><span style="font-size:18px">Click to start</span></div>
-<div id="controls">WASD move · Mouse look · 1–6 select weapon · F / click attack · Shift block · Esc release mouse</div>
-<div id="slot">
-<div class="weapon active" data-i="0"><b>⚔</b>Katana</div><div class="weapon" data-i="1"><b>🗡</b>Blade</div><div class="weapon" data-i="2"><b>🔫</b>Pistol</div><div class="weapon" data-i="3"><b>▰</b>SMG</div><div class="weapon" data-i="4"><b>│</b>Shotgun</div><div class="weapon" data-i="5"><b>⌁</b>Rifle</div>
-</div></div>
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
-const scene=new THREE.Scene();scene.background=new THREE.Color('#171936');scene.fog=new THREE.Fog('#171936',14,38);
-const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,100);camera.position.set(0,1.65,6);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.prepend(renderer.domElement);
-scene.add(new THREE.HemisphereLight('#bcdcff','#24152e',2));const sun=new THREE.DirectionalLight('#fff2df',3);sun.position.set(-5,10,7);sun.castShadow=true;scene.add(sun);
-const floor=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:'#202443',roughness:.75}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);const grid=new THREE.GridHelper(40,40,'#6580b9','#405178');grid.position.y=.006;scene.add(grid);
-for(const z of [-12,12]){const wall=new THREE.Mesh(new THREE.BoxGeometry(24,4,.25),new THREE.MeshStandardMaterial({color:'#202747'}));wall.position.set(0,2,z);scene.add(wall)}
-function limb(r,l,m){const o=new THREE.Mesh(new THREE.CapsuleGeometry(r,l,6,12),m);o.castShadow=true;return o}
-function makeFighter(color){const g=new THREE.Group(),skin=new THREE.MeshStandardMaterial({color:'#d99a7e'}),suit=new THREE.MeshStandardMaterial({color,roughness:.4,metalness:.35}),dark=new THREE.MeshStandardMaterial({color:'#17192b'});const torso=limb(.55,.95,suit);torso.position.y=1.72;torso.scale.z=.72;g.add(torso);const hips=new THREE.Mesh(new THREE.SphereGeometry(.54,16,10),dark);hips.position.y=.92;hips.scale.y=.55;g.add(hips);const head=limb(.38,.08,skin);head.position.y=2.72;g.add(head);const hair=limb(.41,.04,dark);hair.position.y=2.78;g.add(hair);for(const side of [-1,1]){const arm=limb(.18,.72,suit);arm.position.set(side*.78,1.75,0);arm.name=side<0?'leftArm':'rightArm';g.add(arm);const leg=limb(.21,.78,dark);leg.position.set(side*.31,.38,0);leg.name=side<0?'leftLeg':'rightLeg';g.add(leg)}g.traverse(o=>{if(o.isMesh)o.castShadow=true});return g}
-const enemy={x:0,z:-3.2,health:100,windup:0,attack:0,cooldown:.8,hurt:0};const enemyModel=makeFighter('#ff527f');scene.add(enemyModel);
-const player={x:0,z:5,yaw:0,pitch:0,health:100,punch:0,cooldown:0,blocking:false};const keys=new Set();let mode='intro',pointerLocked=false,selected=0,messageTimer=0;
-const weapons=[{name:'Katana',range:2.4,damage:16,gun:false},{name:'Blade',range:2.1,damage:12,gun:false},{name:'Pistol',range:12,damage:10,gun:true},{name:'SMG',range:10,damage:7,gun:true},{name:'Shotgun',range:7,damage:18,gun:true},{name:'Rifle',range:15,damage:13,gun:true}];
-function equip(i){selected=i;document.querySelectorAll('.weapon').forEach((e,n)=>e.classList.toggle('active',n===i));}
-document.querySelectorAll('.weapon').forEach((e,i)=>e.onclick=()=>equip(i));
-const clock=new THREE.Clock();
-function message(text,t=1){document.querySelector('#message').innerHTML=text;messageTimer=t}
-function begin(){player.x=0;player.z=5;player.yaw=0;player.pitch=0;player.health=100;enemy.x=0;enemy.z=-3.2;enemy.health=100;enemy.cooldown=.8;mode='fight';message('FIGHT!',1.2);renderer.domElement.requestPointerLock?.()}
-renderer.domElement.addEventListener('click',()=>{if(mode!=='fight'){begin();return}if(!pointerLocked)renderer.domElement.requestPointerLock?.();else attack()});
-renderer.domElement.addEventListener('contextmenu',e=>e.preventEvent?.()||e.preventDefault());
-document.addEventListener('pointerlockchange',()=>pointerLocked=document.pointerLockElement===renderer.domElement);
-document.addEventListener('mousemove',e=>{if(pointerLocked&&mode==='fight'){player.yaw-=e.movementX*.0022;player.pitch=THREE.MathUtils.clamp(player.pitch-e.movementY*.0022,-.55,.55}});
-document.addEventListener('keydown',e=>{keys.add(e.code);if(e.code.startsWith('Digit'))equip(Number(e.code.slice(5))-1);if(e.code==='KeyF')attack();if(e.code==='Enter'&&mode!=='fight')begin();if(['KeyW','KeyA','KeyS','KeyD','KeyF','ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault()});document.addEventListener('keyup',e=>keys.delete(e.code));
-const gunGroup=new THREE.Group();camera.add(gunGroup);scene.add(camera);const gunMat=new THREE.MeshStandardMaterial({color:'#55d8ff',metalness:.8,roughness:.25});
-function buildWeapon(){gunGroup.clear();const w=weapons[selected];if(w.gun){const gun=new THREE.Mesh(new THREE.BoxGeometry(.18,.16,.68),gunMat);gun.position.set(.38,-.32,-.72);gun.rotation.y=-.08;gunGroup.add(gun);const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.5,12),gunMat);barrel.rotation.x=Math.PI/2;barrel.position.set(.38,-.29,-1.05);gunGroup.add(barrel)}else{const blade=new THREE.Mesh(new THREE.BoxGeometry(.06,.55,1.15),gunMat);blade.position.set(.42,-.28,-.68);blade.rotation.x=.18;gunGroup.add(blade)}}
-function attack(){if(mode!=='fight'||player.cooldown>0)return;const w=weapons[selected];player.cooldown=w.gun?.18:.42;player.punch=.18;buildWeapon();const dx=enemy.x-player.x,dz=enemy.z-player.z,d=Math.hypot(dx,dz);const angle=Math.atan2(dx,-dz),facing=Math.abs(Math.atan2(Math.sin(angle-player.yaw),Math.cos(angle-player.yaw)));if(d<w.range&&facing<(w.gun?1:.9)){enemy.health=Math.max(0,enemy.health-w.damage);enemy.hurt=.25;message(w.name+' HIT!',.45)}else message(w.gun?'SHOT MISSED':'SWING MISSED',.35)}
-canvas.addEventListener?.('');
-function animateEnemy(dt){enemyModel.position.set(enemy.x,0,enemy.z);enemyModel.lookAt(player.x,1.7,player.z);const walk=Math.sin(clock.elapsedTime*5)*.12;enemyModel.getObjectByName('leftLeg')?.rotation.set(walk,0,0);enemyModel.getObjectByName('rightLeg')?.rotation.set(-walk,0,0);const arms=[enemyModel.getObjectByName('leftArm'),enemyModel.getObjectByName('rightArm')];for(const arm of arms){if(arm)arm.rotation.x=enemy.windup>0||enemy.attack>0?-1:0}}
-function update(dt){buildWeapon();if(mode!=='fight'){camera.position.set(player.x,1.65,player.z);camera.rotation.set(0,player.yaw,0);animateEnemy(dt);return}player.cooldown=Math.max(0,player.cooldown-dt);player.punch=Math.max(0,player.punch-dt);enemy.cooldown=Math.max(0,enemy.cooldown-dt);enemy.attack=Math.max(0,enemy.attack-dt);enemy.hurt=Math.max(0,enemy.hurt-dt);messageTimer-=dt;player.blocking=keys.has('ShiftLeft')||keys.has('ShiftRight');const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0),side=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),len=Math.hypot(forward,side)||1,speed=player.blocking?1.8:3.8;player.x+=(Math.sin(player.yaw)*forward+Math.cos(player.yaw)*side)*speed*dt/len;player.z+=(-Math.cos(player.yaw)*forward+Math.sin(player.yaw)*side)*speed*dt/len;player.x=THREE.MathUtils.clamp(player.x,-10,10);player.z=THREE.MathUtils.clamp(player.z,-10,10);camera.position.set(player.x,1.65,player.z);camera.rotation.set(player.pitch,player.yaw,0,'YXZ');const dx=player.x-enemy.x,dz=player.z-enemy.z,d=Math.hypot(dx,dz)||.001;if(enemy.hurt<=0&&d>1.9){enemy.x+=dx/d*1.8*dt;enemy.z+=dz/d*1.8*dt}if(enemy.windup>0){enemy.windup-=dt;if(enemy.windup<=0){enemy.attack=.25;enemy.cooldown=1.2;if(d<2.2&&!player.blocking){player.health=Math.max(0,player.health-12);message('YOU GOT HIT',.65)}else if(d<2.2)message('BLOCKED',.45)}}else if(d<2.5&&enemy.cooldown<=0)enemy.windup=.55;animateEnemy(dt);document.querySelector('#playerFill').style.width=player.health+'%';document.querySelector('#enemyFill').style.width=enemy.health+'%';if(messageTimer<=0)document.querySelector('#message').innerHTML='';if(player.health<=0||enemy.health<=0){mode='over';document.exitPointerLock?.();message(enemy.health<=0?'YOU WIN!':'KNOCKED OUT',999)}}
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2))});function loop(){const dt=Math.min(clock.getDelta(),.04);update(dt);renderer.render(scene,camera);requestAnimationFrame(loop)}loop();
-</script>
+  <div id="message">NEON CLASH</div>
+  <div id="help">WASD: Move · Shift: Sprint</div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#171936');
+    scene.fog = new THREE.Fog('#171936', 18, 45);
+
+    const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 100);
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    document.body.prepend(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight('#bcdcff', '#24152e', 2));
+    const sun = new THREE.DirectionalLight('#fff2df', 3);
+    sun.position.set(-5, 10, 7);
+    sun.castShadow = true;
+    scene.add(sun);
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(40, 40),
+      new THREE.MeshStandardMaterial({color:'#202443', roughness:.75})
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const grid = new THREE.GridHelper(40, 40, '#6580b9', '#405178');
+    grid.position.y = .006;
+    scene.add(grid);
+
+    for (const z of [-12, 12]) {
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(24, 4, .25),
+        new THREE.MeshStandardMaterial({color:'#202747'})
+      );
+      wall.position.set(0, 2, z);
+      scene.add(wall);
+    }
+    for (const x of [-12, 12]) {
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(.25, 4, 24),
+        new THREE.MeshStandardMaterial({color:'#202747'})
+      );
+      wall.position.set(x, 2, 0);
+      scene.add(wall);
+    }
+
+    function makeCharacter(color) {
+      const group = new THREE.Group();
+      const suit = new THREE.MeshStandardMaterial({color, roughness:.4, metalness:.35});
+      const skin = new THREE.MeshStandardMaterial({color:'#d99a7e'});
+      const dark = new THREE.MeshStandardMaterial({color:'#17192b'});
+
+      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.55, .95, 6, 12), suit);
+      torso.position.y = 1.72;
+      torso.scale.z = .72;
+      group.add(torso);
+
+      const hips = new THREE.Mesh(new THREE.SphereGeometry(.54, 16, 10), dark);
+      hips.position.y = .92;
+      hips.scale.y = .55;
+      group.add(hips);
+
+      const head = new THREE.Mesh(new THREE.CapsuleGeometry(.38, .08, 6, 12), skin);
+      head.position.y = 2.72;
+      group.add(head);
+
+      for (const side of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.CapsuleGeometry(.18, .72, 6, 12), suit);
+        arm.position.set(side * .78, 1.75, 0);
+        arm.rotation.z = side * .12;
+        group.add(arm);
+
+        const leg = new THREE.Mesh(new THREE.CapsuleGeometry(.21, .78, 6, 12), dark);
+        leg.position.set(side * .31, .38, 0);
+        leg.name = side < 0 ? 'leftLeg' : 'rightLeg';
+        group.add(leg);
+      }
+
+      group.traverse(object => {
+        if (object.isMesh) {
+          object.castShadow = true;
+          object.receiveShadow = true;
+        }
+      });
+      return group;
+    }
+
+    const player = makeCharacter('#55d8ff');
+    player.position.set(0, 0, 5);
+    scene.add(player);
+
+    const keys = new Set();
+    let elapsed = 0;
+
+    addEventListener('keydown', event => {
+      keys.add(event.code);
+      if (['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(event.code)) {
+        event.preventEvent?.();
+        event.preventDefault();
+      }
+    });
+    addEventListener('keyup', event => keys.delete(event.code));
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    });
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), .04);
+      elapsed += dt;
+
+      const forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+      const right = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+
+      if (forward || right) {
+        const length = Math.hypot(forward, right);
+        const speed = keys.has('ShiftLeft') || keys.has('ShiftRight') ? 7 : 4;
+        const dx = right / length;
+        const dz = -forward / length;
+
+        player.position.x += dx * speed * dt;
+        player.position.z += dz * speed * dt;
+        player.position.x = THREE.MathUtils.clamp(player.position.x, -11, 11);
+        player.position.z = THREE.MathUtils.clamp(player.position.z, -11, 11);
+
+        player.rotation.y = Math.atan2(dx, dz);
+        const walk = Math.sin(elapsed * 12) * .22;
+        player.getObjectByName('leftLeg')?.rotation.set(walk, 0, 0);
+        player.getObjectByName('rightLeg')?.rotation.set(-walk, 0, 0);
+      } else {
+        player.getObjectByName('leftLeg')?.rotation.set(0, 0, 0);
+        player.getObjectByName('rightLeg')?.rotation.set(0, 0, 0);
+      }
+
+      const desiredCamera = new THREE.Vector3(
+        player.position.x,
+        5.5,
+        player.position.z + 8
+      );
+      camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 8));
+      camera.lookAt(player.position.x, 1.7, player.position.z);
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
 </body>
 </html>
