@@ -6,21 +6,27 @@
   <title>Neon Clash 3D</title>
   <style>
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b18;font-family:system-ui,sans-serif;color:#fff}
-    canvas{display:block}#help{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:rgba(5,7,18,.78);font-size:14px;letter-spacing:.04em;pointer-events:none}
-    #message{position:fixed;top:28px;left:50%;transform:translateX(-50%);font-size:34px;font-weight:900;text-shadow:0 3px 20px #000}
+    canvas{display:block}#help{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:rgba(5,7,18,.82);font-size:14px;letter-spacing:.03em;pointer-events:none;white-space:nowrap}
+    #message{position:fixed;top:24px;left:50%;transform:translateX(-50%);font-size:32px;font-weight:900;text-shadow:0 3px 20px #000;text-align:center;pointer-events:none}
+    #hud{position:fixed;top:22px;left:22px;right:22px;display:flex;justify-content:space-between;gap:24px;pointer-events:none}
+    .health{width:min(38vw,360px);font-size:13px;font-weight:800;text-shadow:0 2px 6px #000}.track{height:16px;margin-top:5px;border:2px solid rgba(255,255,255,.8);border-radius:20px;background:#111;overflow:hidden}.fill{height:100%;width:100%;transition:width .15s;background:#55d8ff}.enemy .fill{background:#ff527f}.enemy{text-align:right}
+    @media(max-width:600px){#help{font-size:11px;bottom:12px;padding:8px}#hud{top:12px;left:12px;right:12px}.health{font-size:11px}}
   </style>
 </head>
 <body>
+  <div id="hud">
+    <div class="health">YOU<div class="track"><div id="playerFill" class="fill"></div></div></div>
+    <div class="health enemy">AI OPPONENT<div class="track"><div id="enemyFill" class="fill"></div></div></div>
+  </div>
   <div id="message">NEON CLASH</div>
-  <div id="help">WASD: Move · Shift: Sprint</div>
+  <div id="help">WASD: Move · Shift: Sprint · Space / Click: Attack · Enter: Restart</div>
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#171936');
     scene.fog = new THREE.Fog('#171936', 18, 45);
-
-    const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 100);
+    const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, .05, 100);
     const renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(innerWidth, innerHeight);
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -33,31 +39,21 @@
     sun.castShadow = true;
     scene.add(sun);
 
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 40),
-      new THREE.MeshStandardMaterial({color:'#202443', roughness:.75})
-    );
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({color:'#202443', roughness:.75}));
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
-
     const grid = new THREE.GridHelper(40, 40, '#6580b9', '#405178');
     grid.position.y = .006;
     scene.add(grid);
 
     for (const z of [-12, 12]) {
-      const wall = new THREE.Mesh(
-        new THREE.BoxGeometry(24, 4, .25),
-        new THREE.MeshStandardMaterial({color:'#202747'})
-      );
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(24, 4, .25), new THREE.MeshStandardMaterial({color:'#202747'}));
       wall.position.set(0, 2, z);
       scene.add(wall);
     }
     for (const x of [-12, 12]) {
-      const wall = new THREE.Mesh(
-        new THREE.BoxGeometry(.25, 4, 24),
-        new THREE.MeshStandardMaterial({color:'#202747'})
-      );
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(.25, 4, 24), new THREE.MeshStandardMaterial({color:'#202747'}));
       wall.position.set(x, 2, 0);
       scene.add(wall);
     }
@@ -67,57 +63,90 @@
       const suit = new THREE.MeshStandardMaterial({color, roughness:.4, metalness:.35});
       const skin = new THREE.MeshStandardMaterial({color:'#d99a7e'});
       const dark = new THREE.MeshStandardMaterial({color:'#17192b'});
-
       const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.55, .95, 6, 12), suit);
       torso.position.y = 1.72;
       torso.scale.z = .72;
       group.add(torso);
-
       const hips = new THREE.Mesh(new THREE.SphereGeometry(.54, 16, 10), dark);
       hips.position.y = .92;
       hips.scale.y = .55;
       group.add(hips);
-
       const head = new THREE.Mesh(new THREE.CapsuleGeometry(.38, .08, 6, 12), skin);
       head.position.y = 2.72;
       group.add(head);
-
       for (const side of [-1, 1]) {
         const arm = new THREE.Mesh(new THREE.CapsuleGeometry(.18, .72, 6, 12), suit);
         arm.position.set(side * .78, 1.75, 0);
-        arm.rotation.z = side * .12;
+        arm.name = side < 0 ? 'leftArm' : 'rightArm';
         group.add(arm);
-
         const leg = new THREE.Mesh(new THREE.CapsuleGeometry(.21, .78, 6, 12), dark);
         leg.position.set(side * .31, .38, 0);
         leg.name = side < 0 ? 'leftLeg' : 'rightLeg';
         group.add(leg);
       }
-
       group.traverse(object => {
-        if (object.isMesh) {
-          object.castShadow = true;
-          object.receiveShadow = true;
-        }
+        if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; }
       });
       return group;
     }
 
     const player = makeCharacter('#55d8ff');
-    player.position.set(0, 0, 5);
-    scene.add(player);
+    const enemy = makeCharacter('#ff527f');
+    scene.add(player, enemy);
 
+    const playerState = {health:100, attackCooldown:0, hurt:0};
+    const enemyState = {health:100, attackCooldown:1, hurt:0};
     const keys = new Set();
     let elapsed = 0;
+    let gameOver = false;
+
+    function setMessage(text) { document.querySelector('#message').textContent = text; }
+    function updateHealth() {
+      document.querySelector('#playerFill').style.width = `${playerState.health}%`;
+      document.querySelector('#enemyFill').style.width = `${enemyState.health}%`;
+    }
+    function resetGame() {
+      player.position.set(0, 0, 5);
+      enemy.position.set(0, 0, -5);
+      playerState.health = enemyState.health = 100;
+      playerState.attackCooldown = 0;
+      enemyState.attackCooldown = 1;
+      playerState.hurt = enemyState.hurt = 0;
+      gameOver = false;
+      setMessage('FIGHT!');
+      updateHealth();
+    }
+
+    function attack() {
+      if (gameOver || playerState.attackCooldown > 0) return;
+      playerState.attackCooldown = .55;
+      player.getObjectByName('rightArm').rotation.x = -1.2;
+      const distance = player.position.distanceTo(enemy.position);
+      const facing = new THREE.Vector3(0, 0, 1).applyEuler(player.rotation);
+      const toEnemy = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
+      if (distance < 2.2 && facing.dot(toEnemy) > .25) {
+        enemyState.health = Math.max(0, enemyState.health - 18);
+        enemyState.hurt = .28;
+        setMessage('HIT!');
+        if (enemyState.health === 0) endGame('YOU WIN!');
+      }
+      updateHealth();
+    }
+
+    function endGame(text) {
+      gameOver = true;
+      setMessage(`${text} — Press Enter to play again`);
+    }
 
     addEventListener('keydown', event => {
       keys.add(event.code);
-      if (['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(event.code)) {
-        event.preventEvent?.();
-        event.preventDefault();
-      }
+      if (['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(event.code)) event.preventDefault();
+      if (event.code === 'Space' && !event.repeat) attack();
+      if (event.code === 'Enter' && gameOver) resetGame();
     });
     addEventListener('keyup', event => keys.delete(event.code));
+    renderer.domElement.addEventListener('click', attack);
+    addEventListener('blur', () => keys.clear());
 
     addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
@@ -127,46 +156,78 @@
     });
 
     const clock = new THREE.Clock();
-
     function animate() {
       requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), .04);
       elapsed += dt;
+      playerState.attackCooldown = Math.max(0, playerState.attackCooldown - dt);
+      enemyState.attackCooldown = Math.max(0, enemyState.attackCooldown - dt);
+      playerState.hurt = Math.max(0, playerState.hurt - dt);
+      enemyState.hurt = Math.max(0, enemyState.hurt - dt);
+      if (playerState.hurt === 0) player.getObjectByName('rightArm').rotation.x = 0;
+      if (enemyState.hurt === 0) enemy.getObjectByName('rightArm').rotation.x = 0;
 
-      const forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
-      const right = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-
-      if (forward || right) {
-        const length = Math.hypot(forward, right);
-        const speed = keys.has('ShiftLeft') || keys.has('ShiftRight') ? 7 : 4;
-        const dx = right / length;
-        const dz = -forward / length;
-
-        player.position.x += dx * speed * dt;
-        player.position.z += dz * speed * dt;
+      if (!gameOver) {
+        const forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+        const right = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+        if (forward || right) {
+          const length = Math.hypot(forward, right);
+          const speed = keys.has('ShiftLeft') || keys.has('ShiftRight') ? 7 : 4;
+          const dx = right / length, dz = -forward / length;
+          player.position.x += dx * speed * dt;
+          player.position.z += dz * speed * dt;
+          player.rotation.y = Math.atan2(dx, dz);
+          animateLegs(player, elapsed * 12);
+        } else {
+          stopLegs(player);
+        }
         player.position.x = THREE.MathUtils.clamp(player.position.x, -11, 11);
         player.position.z = THREE.MathUtils.clamp(player.position.z, -11, 11);
 
-        player.rotation.y = Math.atan2(dx, dz);
-        const walk = Math.sin(elapsed * 12) * .22;
-        player.getObjectByName('leftLeg')?.rotation.set(walk, 0, 0);
-        player.getObjectByName('rightLeg')?.rotation.set(-walk, 0, 0);
-      } else {
-        player.getObjectByName('leftLeg')?.rotation.set(0, 0, 0);
-        player.getObjectByName('rightLeg')?.rotation.set(0, 0, 0);
+        // The AI faces the player, closes distance, and attacks when close enough.
+        const dx = player.position.x - enemy.position.x;
+        const dz = player.position.z - enemy.position.z;
+        const distance = Math.hypot(dx, dz) || .001;
+        enemy.rotation.y = Math.atan2(dx, dz);
+        if (distance > 1.65) {
+          const aiSpeed = distance > 5 ? 2.6 : 1.8;
+          enemy.position.x += dx / distance * aiSpeed * dt;
+          enemy.position.z += dz / distance * aiSpeed * dt;
+          animateLegs(enemy, elapsed * 9);
+        } else {
+          stopLegs(enemy);
+          if (enemyState.attackCooldown <= 0) {
+            enemyState.attackCooldown = 1.15;
+            enemy.getObjectByName('rightArm').rotation.x = -1.1;
+            if (playerState.hurt <= 0) {
+              playerState.health = Math.max(0, playerState.health - 9);
+              playerState.hurt = .3;
+              updateHealth();
+              setMessage('THE OPPONENT HIT YOU');
+              if (playerState.health === 0) endGame('KNOCKED OUT');
+            }
+          }
+        }
+        enemy.position.x = THREE.MathUtils.clamp(enemy.position.x, -11, 11);
+        enemy.position.z = THREE.MathUtils.clamp(enemy.position.z, -11, 11);
       }
 
-      const desiredCamera = new THREE.Vector3(
-        player.position.x,
-        5.5,
-        player.position.z + 8
-      );
+      const desiredCamera = new THREE.Vector3(player.position.x, 5.5, player.position.z + 8);
       camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 8));
-      camera.lookAt(player.position.x, 1.7, player.position.z);
-
+      camera.lookAt(player.position.x, 1.4, player.position.z - .5);
       renderer.render(scene, camera);
     }
 
+    function animateLegs(character, phase) {
+      character.getObjectByName('leftLeg').rotation.x = Math.sin(phase) * .3;
+      character.getObjectByName('rightLeg').rotation.x = -Math.sin(phase) * .3;
+    }
+    function stopLegs(character) {
+      character.getObjectByName('leftLeg').rotation.x = 0;
+      character.getObjectByName('rightLeg').rotation.x = 0;
+    }
+
+    resetGame();
     animate();
   </script>
 </body>
